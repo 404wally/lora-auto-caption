@@ -4,8 +4,8 @@
 
 **Project:** LoRA Auto Caption
 **Timeline:** January 2026
-**Tools Used:** Claude Code, Claude API, Node.js, Express, Tailwind CSS
-**Status:** Ready for deployment
+**Tools Used:** Claude Code, Claude API, Node.js, Express, Tailwind CSS, Gemini (image generation)
+**Status:** Live at [lora-auto-caption.onrender.com](https://lora-auto-caption.onrender.com)
 
 ---
 
@@ -101,6 +101,37 @@ Decided to give the interface real personality with a **Star Trek LCARS** (Libra
 - README.txt ends with "LIVE LONG AND PROSPER"
 - Version number "v4.7.2" in footer
 
+### Phase 5: Polish & Responsiveness
+
+Added interactive feedback and mobile support:
+
+**Sound Effects (Web Audio API):**
+- Synthesized LCARS-style blips and chirps
+- No external audio files needed
+- Subtle feedback on button clicks and state changes
+
+**Hover Interactions:**
+- Glow effects on interactive elements
+- Sidebar buttons slide on hover
+- Brightness shifts for visual feedback
+
+**Responsive Design:**
+- Mobile: Sidebars hidden, compact footer, touch-friendly
+- Tablet: Full layout with adjusted spacing
+- Desktop: Complete LCARS frame experience
+
+### Phase 6: Deployment & Social Sharing
+
+**Deployed to Render.com:**
+- Connected GitHub repo for auto-deploy
+- Environment variable for API key
+- Live at custom URL
+
+**Open Graph Integration:**
+- Custom social preview image generated with Gemini AI
+- Clean "LAC" logo design—iconic and minimal
+- Meta tags for rich link previews on social/messaging
+
 ---
 
 ## Technical Highlights
@@ -137,6 +168,16 @@ lora-training-package.zip
 └── README.txt
 ```
 
+### Web Audio Synthesis
+
+Sound effects generated entirely in code:
+```javascript
+// No audio files needed
+oscillator.type = 'sine';
+oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+// Creates authentic LCARS-style beeps
+```
+
 ---
 
 ## Key Decisions
@@ -147,6 +188,8 @@ lora-training-package.zip
 | Client-side resize | Reduces server load, works offline after initial load |
 | Sequential processing | Prevents API rate limits, shows real-time progress |
 | LCARS theme | Memorable UX, stands out from generic tools |
+| Web Audio API | No external dependencies for sound effects |
+| Minimal OG image | Clean branding > busy screenshots for social sharing |
 
 ---
 
@@ -164,22 +207,26 @@ The tool transforms a tedious prerequisite into an enjoyable part of the LoRA tr
 1. **Start functional, add personality later** - Get the core working first, then invest in UX
 2. **Knowledge bases accelerate decisions** - Having design principles indexed in RAG made the UI direction clear
 3. **Theme commits create cohesion** - Going all-in on LCARS meant every element reinforced the concept
-4. **Claude Code enables rapid iteration** - Full-stack app built and themed in a single session
+4. **Claude Code enables rapid iteration** - Full-stack app built, themed, and deployed in a single session
+5. **Social previews matter** - A clean OG image makes sharing more impactful than a busy screenshot
+6. **Mobile-first finishing** - Testing on actual devices reveals issues desktop simulation misses
 
 ---
 
 ## What's Next
 
-- Deploy to Render.com for public access
-- Add batch processing progress indicator
-- Consider adding style presets (anime, photorealistic, etc.)
+- Add style presets (anime, photorealistic, etc.)
+- Batch processing progress indicator
 - Explore direct Civitai API integration
+- Consider PWA for offline capability
 
 ---
 
 ## Try It Yourself
 
-The code is open source and ready to deploy:
+**Live Demo:** [lora-auto-caption.onrender.com](https://lora-auto-caption.onrender.com)
+
+**Source Code:** [github.com/404wally/lora-auto-caption](https://github.com/404wally/lora-auto-caption)
 
 **Tech Stack:**
 - Node.js 18+
@@ -207,17 +254,21 @@ ANTHROPIC_API_KEY=your-key-here
 >
 > Sometimes the best tools are the ones that make tedious tasks feel like you're on the bridge of the Enterprise.
 >
+> Try it: lora-auto-caption.onrender.com
+>
 > #AI #MachineLearning #DeveloperTools #UXDesign #ClaudeAI
 
 ### Threads/X Version (Casual)
 
-> just built a tool that captions LoRA training images using Claude AI
+> just shipped my first vibe code project
 >
-> the boring part: drag images → AI analyzes each one → generates training captions → exports ZIP
+> LoRA Auto Caption: drag images → AI analyzes each one → generates training captions → exports ZIP
 >
-> the fun part: gave it a Star Trek LCARS interface because why not
+> gave it a Star Trek LCARS interface because why not
 >
 > "INITIATE CAPTION ANALYSIS" hits different
+>
+> lora-auto-caption.onrender.com
 
 ### Technical Version
 
@@ -229,12 +280,16 @@ ANTHROPIC_API_KEY=your-key-here
 > - Vision API for image analysis
 > - Client-side canvas resizing
 > - JSZip for browser-side packaging
-> - LCARS-themed UI (yes, really)
+> - LCARS-themed UI with Web Audio sound effects
+> - Responsive mobile/tablet support
 >
-> Turns 2-4 hours of manual captioning into 5 minutes of AI + review.
+> Turns 2-4 hours of manual captioning into 5 minutes.
 >
 > Built entirely in Claude Code in one session.
+>
+> Live: lora-auto-caption.onrender.com
 
 ---
 
-*Case study generated: January 2026*
+*Case study updated: January 2026*
+*A WAREZ.STUDIO project*
