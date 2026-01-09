@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LoRA Auto Caption | LCARS Interface</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            lcars: {
+              black: '#000000',
+              bg: '#111111',
+              orange: '#FF9900',
+              peach: '#FFCC99',
+              lavender: '#CC99FF',
+              blue: '#99CCFF',
+              red: '#CC4444',
+              gold: '#FFAA00',
+              purple: '#9977AA',
+              tan: '#DDBBAA',
+            }
+          },
+          fontFamily: {
+            lcars: ['Arial', 'Helvetica', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Antonio:wght@400;500;700&display=swap');
+
+    * { font-family: 'Antonio', 'Arial', sans-serif; }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    @keyframes scan {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    .spinner { animation: spin 1s linear infinite; }
+    .pulse { animation: pulse 2s ease-in-out infinite; }
+    .blink { animation: blink 1s step-end infinite; }
+
+    .lcars-btn {
+      clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 50%, calc(100% - 20px) 100%, 0 100%, 20px 50%);
+      padding: 12px 40px;
+    }
+    .lcars-btn-left {
+      border-radius: 20px 0 0 20px;
+    }
+    .lcars-btn-right {
+      border-radius: 0 20px 20px 0;
+    }
+    .lcars-pill {
+      border-radius: 25px;
+    }
+    .lcars-pill-left {
+      border-radius: 25px 0 0 25px;
+    }
+    .lcars-pill-right {
+      border-radius: 0 25px 25px 0;
+    }
+    .lcars-elbow-tl {
+      border-radius: 40px 0 0 0;
+    }
+    .lcars-elbow-tr {
+      border-radius: 0 40px 0 0;
+    }
+    .lcars-elbow-bl {
+      border-radius: 0 0 0 40px;
+    }
+    .lcars-elbow-br {
+      border-radius: 0 0 40px 0;
+    }
+
+    .image-card:hover .remove-btn { opacity: 1; }
+
+    .scan-line {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(90deg, transparent, rgba(153, 204, 255, 0.3), transparent);
+      animation: scan 2s linear infinite;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 12px; }
+    ::-webkit-scrollbar-track { background: #111; }
+    ::-webkit-scrollbar-thumb { background: #FF9900; border-radius: 6px; }
+    ::-webkit-scrollbar-thumb:hover { background: #FFAA00; }
+
+    /* LCARS Interactive Effects */
+    .lcars-interactive {
+      transition: all 0.15s ease-out;
+      cursor: pointer;
+    }
+    .lcars-interactive:hover {
+      filter: brightness(1.3);
+      box-shadow: 0 0 15px currentColor, inset 0 0 10px rgba(255,255,255,0.1);
+    }
+    .lcars-interactive:active {
+      filter: brightness(1.5);
+      transform: scale(0.98);
+    }
+
+    /* Glow effects for different colors */
+    .glow-orange:hover { box-shadow: 0 0 20px #FF9900, 0 0 40px rgba(255,153,0,0.3); }
+    .glow-lavender:hover { box-shadow: 0 0 20px #CC99FF, 0 0 40px rgba(204,153,255,0.3); }
+    .glow-blue:hover { box-shadow: 0 0 20px #99CCFF, 0 0 40px rgba(153,204,255,0.3); }
+    .glow-peach:hover { box-shadow: 0 0 20px #FFCC99, 0 0 40px rgba(255,204,153,0.3); }
+    .glow-green:hover { box-shadow: 0 0 20px #22c55e, 0 0 40px rgba(34,197,94,0.3); }
+    .glow-red:hover { box-shadow: 0 0 20px #CC4444, 0 0 40px rgba(204,68,68,0.3); }
+    .glow-purple:hover { box-shadow: 0 0 20px #9977AA, 0 0 40px rgba(153,119,170,0.3); }
+
+    /* Sidebar button hover */
+    .sidebar-btn {
+      transition: all 0.2s ease-out;
+    }
+    .sidebar-btn:hover {
+      transform: translateX(8px);
+      filter: brightness(1.2);
+      box-shadow: -5px 0 15px currentColor;
+    }
+
+    /* Nav pill enhanced hover */
+    .nav-pill {
+      transition: all 0.2s ease-out;
+      position: relative;
+      overflow: hidden;
+    }
+    .nav-pill::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.4s ease-out;
+    }
+    .nav-pill:hover::after {
+      left: 100%;
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+      .sidebar-left, .sidebar-right { display: none; }
+      .top-bar-mobile { border-radius: 0; }
+      .nav-pill { padding-left: 12px; padding-right: 12px; font-size: 12px; }
+      .lcars-title { font-size: 1.5rem; }
+      .main-content { padding: 12px; }
+    }
+
+    @media (max-width: 480px) {
+      .nav-pill span { font-size: 10px; }
+      .stardate-display { display: none; }
+    }
+
+    /* Performance: Reduce paint on scroll */
+    .scroll-container {
+      will-change: scroll-position;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Reduce animation on preference */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-lcars-black text-white overflow-x-hidden">
+
+  <!-- Main LCARS Frame -->
+  <div class="flex min-h-screen">
+
+    <!-- Left Sidebar Frame -->
+    <div class="w-32 flex flex-col shrink-0 sidebar-left hidden md:flex">
+      <!-- Top elbow -->
+      <div class="h-12 bg-lcars-orange lcars-elbow-tl"></div>
+
+      <!-- Sidebar buttons -->
+      <div class="flex-1 flex flex-col gap-2 py-4">
+        <div class="h-12 bg-lcars-peach lcars-pill-right mr-2 flex items-center justify-end pr-4 sidebar-btn glow-peach" data-sound="blip">
+          <span class="text-black text-sm font-bold tracking-wider">01</span>
+        </div>
+        <div class="h-12 bg-lcars-lavender lcars-pill-right mr-2 flex items-center justify-end pr-4 sidebar-btn glow-lavender" data-sound="blip">
+          <span class="text-black text-sm font-bold tracking-wider">02</span>
+        </div>
+        <div class="h-12 bg-lcars-blue lcars-pill-right mr-2 flex items-center justify-end pr-4 sidebar-btn glow-blue" data-sound="blip">
+          <span class="text-black text-sm font-bold tracking-wider">03</span>
+        </div>
+        <div class="flex-1"></div>
+        <div class="h-8 bg-lcars-purple lcars-pill-right mr-2 sidebar-btn glow-purple" data-sound="blip"></div>
+        <div class="h-8 bg-lcars-tan lcars-pill-right mr-2 sidebar-btn glow-peach" data-sound="blip"></div>
+      </div>
+
+      <!-- Bottom elbow -->
+      <div class="h-16 bg-lcars-orange lcars-elbow-bl"></div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="flex-1 flex flex-col">
+
+      <!-- Top Bar -->
+      <div class="h-12 flex">
+        <div class="flex-1 bg-lcars-orange"></div>
+        <div class="flex items-center gap-2 px-4">
+          <div id="step1-indicator" class="h-10 px-6 bg-lcars-orange lcars-pill nav-pill flex items-center justify-center cursor-pointer glow-orange" data-sound="chirp">
+            <span class="text-black font-bold tracking-wider">UPLOAD</span>
+          </div>
+          <div id="step2-indicator" class="h-10 px-6 bg-lcars-lavender/30 lcars-pill nav-pill flex items-center justify-center cursor-pointer glow-lavender" data-sound="chirp">
+            <span class="text-lcars-lavender/60 font-bold tracking-wider">REVIEW</span>
+          </div>
+          <div id="step3-indicator" class="h-10 px-6 bg-lcars-blue/30 lcars-pill nav-pill flex items-center justify-center cursor-pointer glow-blue" data-sound="chirp">
+            <span class="text-lcars-blue/60 font-bold tracking-wider">EXPORT</span>
+          </div>
+        </div>
+        <div class="w-48 bg-lcars-peach lcars-pill-right flex items-center justify-center stardate-display hidden sm:flex">
+          <span class="text-black font-bold tracking-wider text-sm" id="stardate">LCARS 47634.8</span>
+        </div>
+      </div>
+
+      <!-- Header Title Bar -->
+      <div class="flex items-center gap-2 md:gap-4 py-2 px-2 md:px-4 border-b-4 border-lcars-orange">
+        <h1 class="text-xl md:text-3xl lg:text-4xl font-bold text-lcars-orange tracking-wider whitespace-nowrap">LORA AUTO CAPTION</h1>
+        <div class="flex-1 flex items-center gap-2">
+          <div class="h-2 flex-1 bg-lcars-orange/20 rounded-full overflow-hidden">
+            <div class="h-full bg-lcars-orange w-0 transition-all duration-500" id="progressBar"></div>
+          </div>
+        </div>
+        <div class="text-lcars-blue text-sm tracking-wider">
+          <span class="text-lcars-peach">STATUS:</span>
+          <span id="systemStatus" class="pulse">READY</span>
+        </div>
+      </div>
+
+      <!-- Main Content -->
+      <div class="flex-1 p-2 md:p-4 overflow-y-auto scroll-container">
+
+        <!-- Step 1: Upload -->
+        <section id="step1" class="space-y-4">
+
+          <!-- Trigger Word Panel -->
+          <div class="flex gap-3">
+            <div class="w-2 bg-lcars-lavender rounded-full"></div>
+            <div class="flex-1 bg-lcars-bg border border-lcars-lavender/30 rounded-lg p-4">
+              <div class="flex items-center gap-3 mb-2">
+                <label class="text-lcars-lavender font-bold tracking-wider">TRIGGER WORD</label>
+                <input
+                  type="text"
+                  id="triggerWord"
+                  value="my_character"
+                  class="flex-1 max-w-xs px-3 py-2 rounded bg-black border-2 border-lcars-lavender/50 text-lcars-lavender tracking-wider focus:outline-none focus:border-lcars-lavender uppercase"
+                />
+              </div>
+              <p class="text-lcars-lavender/60 text-xs tracking-wide">This identifier starts every caption and activates your character</p>
+            </div>
+          </div>
+
+          <!-- Drop Zone Panel -->
+          <div class="flex gap-3">
+            <div class="w-2 bg-lcars-blue rounded-full"></div>
+            <div
+              id="dropZone"
+              class="flex-1 bg-lcars-bg border-2 border-dashed border-lcars-blue/50 rounded-lg p-6 text-center cursor-pointer transition-all hover:border-lcars-blue hover:bg-lcars-blue/5 relative overflow-hidden"
+            >
+              <div class="scan-line opacity-0 transition-opacity" id="scanLine"></div>
+              <div class="relative z-10 flex items-center justify-center gap-6">
+                <div class="text-4xl text-lcars-blue">&#9651;</div>
+                <div class="text-left">
+                  <p class="text-lcars-blue font-bold tracking-wider mb-1">DROP IMAGE FILES OR CLICK TO UPLOAD</p>
+                  <p class="text-lcars-blue/60 text-sm tracking-wide">JPG, PNG, WEBP • Recommended: 20-40 images</p>
+                </div>
+              </div>
+              <input type="file" id="fileInput" multiple accept="image/jpeg,image/png,image/webp" class="hidden" />
+            </div>
+          </div>
+
+          <!-- Image Preview Grid -->
+          <div id="previewSection" class="hidden">
+            <div class="flex gap-3">
+              <div class="w-2 bg-lcars-peach rounded-full"></div>
+              <div class="flex-1">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-lcars-peach font-bold tracking-wider text-sm"><span id="imageCount">0</span> IMAGES LOADED</span>
+                  <button id="clearAllBtn" class="px-3 py-1 bg-lcars-red/20 border border-lcars-red/50 text-lcars-red rounded hover:bg-lcars-red/30 transition tracking-wider text-xs lcars-interactive glow-red" data-sound="error">
+                    CLEAR ALL
+                  </button>
+                </div>
+                <div id="imageGrid" class="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Generate Button -->
+          <div id="generateSection" class="hidden">
+            <div class="flex gap-4 items-center justify-center">
+              <div class="flex-1 h-px bg-gradient-to-r from-transparent via-lcars-orange to-transparent"></div>
+              <button
+                id="generateBtn"
+                class="px-8 py-3 bg-lcars-orange text-black font-bold tracking-wider lcars-pill lcars-interactive glow-orange"
+                data-sound="engage"
+              >
+                &#9889; INITIATE CAPTION ANALYSIS
+              </button>
+              <div class="flex-1 h-px bg-gradient-to-r from-transparent via-lcars-orange to-transparent"></div>
+            </div>
+            <p class="text-center text-lcars-orange/60 text-xs mt-2 tracking-wider">Claude AI will analyze each image and generate training captions</p>
+          </div>
+        </section>
+
+        <!-- Step 2: Review -->
+        <section id="step2" class="hidden space-y-6">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+              <button id="backToUploadBtn" class="px-4 py-2 bg-lcars-purple/30 border border-lcars-purple text-lcars-purple rounded hover:bg-lcars-purple/50 transition tracking-wider text-sm lcars-pill-left lcars-interactive glow-purple" data-sound="chirp">
+                &#9664; RETURN
+              </button>
+              <div class="h-8 w-2 bg-lcars-lavender"></div>
+              <h2 class="text-2xl font-bold text-lcars-lavender tracking-wider">CAPTION REVIEW CONSOLE</h2>
+              <div class="px-4 py-1 bg-lcars-bg border border-lcars-blue rounded">
+                <span id="approvedCount" class="text-lcars-blue tracking-wider">0 OF 0 VERIFIED</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <button id="approveAllBtn" class="hidden px-6 py-2 bg-green-600 text-white font-bold tracking-wider rounded hover:bg-green-500 transition lcars-pill lcars-interactive glow-green" data-sound="confirm">
+                VERIFY ALL
+              </button>
+              <button id="continueToExportBtn" class="px-6 py-2 bg-lcars-blue/30 text-lcars-blue/50 font-bold tracking-wider rounded cursor-not-allowed lcars-pill-right" disabled data-sound="engage">
+                PROCEED TO EXPORT &#9654;
+              </button>
+            </div>
+          </div>
+
+          <div id="captionList" class="space-y-3"></div>
+        </section>
+
+        <!-- Step 3: Export -->
+        <section id="step3" class="hidden space-y-6">
+          <div class="text-center mb-8">
+            <div class="inline-block px-8 py-4 bg-lcars-bg border-2 border-green-500 rounded-lg">
+              <div class="text-green-400 text-5xl mb-2">&#10003;</div>
+              <h2 class="text-3xl font-bold text-green-400 tracking-wider">EXPORT SEQUENCE READY</h2>
+              <p id="exportSummary" class="text-green-400/70 mt-2 tracking-wider">0 IMAGES WITH CAPTIONS PREPARED FOR TRAINING</p>
+            </div>
+          </div>
+
+          <div class="grid md:grid-cols-2 gap-6">
+            <!-- Package Info -->
+            <div class="flex gap-4">
+              <div class="w-4 bg-lcars-orange rounded-full"></div>
+              <div class="flex-1 bg-lcars-bg border border-lcars-orange/30 rounded-lg p-6">
+                <div class="flex items-center gap-4 mb-4">
+                  <div class="h-8 w-2 bg-lcars-orange"></div>
+                  <h3 class="text-lcars-orange font-bold tracking-wider">PACKAGE MANIFEST</h3>
+                </div>
+                <ul class="space-y-3 text-lcars-peach tracking-wide">
+                  <li id="exportImageCount" class="flex items-center gap-2">
+                    <span class="w-2 h-2 bg-lcars-orange rounded-full"></span>
+                    0 VERIFIED IMAGES (RESIZED)
+                  </li>
+                  <li id="exportCaptionCount" class="flex items-center gap-2">
+                    <span class="w-2 h-2 bg-lcars-orange rounded-full"></span>
+                    0 CAPTION TEXT FILES
+                  </li>
+                  <li class="flex items-center gap-2">
+                    <span class="w-2 h-2 bg-lcars-orange rounded-full"></span>
+                    TRIGGER: <code id="exportTriggerWord" class="bg-black px-2 py-1 rounded text-lcars-lavender ml-2">my_character</code>
+                  </li>
+                </ul>
+                <div class="mt-6">
+                  <label class="block text-lcars-orange/70 text-sm mb-2 tracking-wider">OUTPUT DIMENSIONS</label>
+                  <select id="outputSize" class="w-full px-4 py-3 rounded bg-black border-2 border-lcars-orange/50 text-lcars-orange focus:outline-none focus:border-lcars-orange tracking-wider">
+                    <option value="512">512 x 512 PIXELS</option>
+                    <option value="768">768 x 768 PIXELS</option>
+                    <option value="1024" selected>1024 x 1024 PIXELS</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Caption Preview -->
+            <div class="flex gap-4">
+              <div class="w-4 bg-lcars-blue rounded-full"></div>
+              <div class="flex-1 bg-lcars-bg border border-lcars-blue/30 rounded-lg p-6">
+                <div class="flex items-center gap-4 mb-4">
+                  <div class="h-8 w-2 bg-lcars-blue"></div>
+                  <h3 class="text-lcars-blue font-bold tracking-wider">CAPTION DATA PREVIEW</h3>
+                </div>
+                <div id="captionPreview" class="max-h-64 overflow-y-auto space-y-2 text-sm"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex items-center justify-center gap-4 pt-4">
+            <button id="backToReviewBtn" class="px-8 py-3 bg-lcars-purple/30 border border-lcars-purple text-lcars-purple font-bold tracking-wider rounded hover:bg-lcars-purple/50 transition lcars-pill-left lcars-interactive glow-purple" data-sound="chirp">
+              &#9664; RETURN TO REVIEW
+            </button>
+            <button id="downloadZipBtn" class="px-12 py-4 bg-lcars-orange text-black font-bold text-xl tracking-wider lcars-pill lcars-interactive glow-orange" data-sound="engage">
+              &#128230; DOWNLOAD PACKAGE
+            </button>
+          </div>
+
+          <!-- Next Steps -->
+          <div class="flex gap-4 mt-6">
+            <div class="w-4 bg-lcars-gold rounded-full"></div>
+            <div class="flex-1 bg-lcars-gold/10 border border-lcars-gold/30 rounded-lg p-6">
+              <div class="flex items-center gap-4 mb-4">
+                <div class="h-8 w-2 bg-lcars-gold"></div>
+                <h3 class="text-lcars-gold font-bold tracking-wider">TRAINING PROTOCOL</h3>
+              </div>
+              <ol class="space-y-2 text-lcars-gold/80 tracking-wide">
+                <li>1. NAVIGATE TO CIVITAI.COM &#8594; CREATE &#8594; TRAIN A LORA</li>
+                <li>2. UPLOAD PACKAGE CONTENTS (IMAGES + CAPTION FILES)</li>
+                <li>3. RECOMMENDED PARAMETERS: RANK 32, ALPHA 16, EPOCHS 15-20</li>
+                <li>4. TRIGGER DESIGNATION: <code id="nextStepsTrigger" class="bg-black px-2 py-1 rounded text-lcars-lavender">my_character</code></li>
+              </ol>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- Bottom Bar -->
+      <div class="h-16 flex items-start">
+        <div class="flex-1 h-8 bg-lcars-orange flex items-center justify-center">
+          <span class="text-black text-xs font-bold tracking-wider">POWERED BY WAREZ</span>
+        </div>
+        <div class="flex gap-2 px-4 h-8">
+          <div class="w-16 h-full bg-lcars-lavender rounded-b"></div>
+          <div class="w-24 h-full bg-lcars-blue rounded-b"></div>
+          <div class="w-12 h-full bg-lcars-peach rounded-b"></div>
+        </div>
+        <div class="w-32 h-8 bg-lcars-orange lcars-pill-right flex items-center justify-center">
+          <span class="text-black text-xs font-bold tracking-wider">v4.7.2</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right Sidebar Frame -->
+    <div class="w-8 flex flex-col shrink-0 sidebar-right hidden md:flex">
+      <div class="h-12 bg-lcars-peach lcars-elbow-tr"></div>
+      <div class="flex-1 bg-lcars-peach/20"></div>
+      <div class="h-16 bg-lcars-peach lcars-elbow-br"></div>
+    </div>
+
+  </div>
+
+  <script>
+    // Update stardate
+    function updateStardate() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const startOfYear = new Date(year, 0, 1);
+      const dayOfYear = Math.floor((now - startOfYear) / (24 * 60 * 60 * 1000));
+      const stardate = (year - 2323) * 1000 + dayOfYear;
+      document.getElementById('stardate').textContent = `LCARS ${stardate.toFixed(1)}`;
+    }
+    updateStardate();
+    setInterval(updateStardate, 60000);
+
+    // LCARS Audio System
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new AudioContext();
+      }
+    }
+
+    function playSound(type) {
+      if (!audioCtx) return;
+
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      const now = audioCtx.currentTime;
+
+      switch(type) {
+        case 'blip':
+          // Short high blip
+          oscillator.frequency.setValueAtTime(1200, now);
+          oscillator.frequency.exponentialRampToValueAtTime(800, now + 0.05);
+          gainNode.gain.setValueAtTime(0.08, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+          oscillator.start(now);
+          oscillator.stop(now + 0.08);
+          break;
+
+        case 'chirp':
+          // Two-tone chirp
+          oscillator.frequency.setValueAtTime(600, now);
+          oscillator.frequency.setValueAtTime(900, now + 0.06);
+          gainNode.gain.setValueAtTime(0.08, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+          oscillator.start(now);
+          oscillator.stop(now + 0.12);
+          break;
+
+        case 'engage':
+          // Activation sound - rising sweep
+          oscillator.frequency.setValueAtTime(400, now);
+          oscillator.frequency.exponentialRampToValueAtTime(1000, now + 0.15);
+          gainNode.gain.setValueAtTime(0.1, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+          oscillator.start(now);
+          oscillator.stop(now + 0.2);
+          break;
+
+        case 'confirm':
+          // Double beep confirmation
+          oscillator.frequency.setValueAtTime(880, now);
+          gainNode.gain.setValueAtTime(0.08, now);
+          gainNode.gain.setValueAtTime(0, now + 0.05);
+          gainNode.gain.setValueAtTime(0.08, now + 0.1);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+          oscillator.start(now);
+          oscillator.stop(now + 0.15);
+          break;
+
+        case 'error':
+          // Low warning tone
+          oscillator.frequency.setValueAtTime(200, now);
+          oscillator.frequency.setValueAtTime(150, now + 0.1);
+          gainNode.gain.setValueAtTime(0.1, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+          oscillator.start(now);
+          oscillator.stop(now + 0.2);
+          break;
+      }
+    }
+
+    // Initialize audio on first user interaction
+    document.addEventListener('click', function initOnClick() {
+      initAudio();
+      document.removeEventListener('click', initOnClick);
+    }, { once: true });
+
+    // Add sound to all interactive elements
+    document.addEventListener('mouseenter', (e) => {
+      const target = e.target.closest('[data-sound]');
+      if (target && audioCtx) {
+        playSound('blip');
+      }
+    }, true);
+
+    document.addEventListener('click', (e) => {
+      const target = e.target.closest('[data-sound]');
+      if (target && audioCtx) {
+        const sound = target.dataset.sound || 'chirp';
+        playSound(sound);
+      }
+    }, true);
+
+    // State
+    let images = [];
+    let captions = [];
+    let currentStep = 1;
+
+    // Elements
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const triggerWordInput = document.getElementById('triggerWord');
+    const previewSection = document.getElementById('previewSection');
+    const imageGrid = document.getElementById('imageGrid');
+    const imageCount = document.getElementById('imageCount');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+    const generateSection = document.getElementById('generateSection');
+    const generateBtn = document.getElementById('generateBtn');
+    const step1 = document.getElementById('step1');
+    const step2 = document.getElementById('step2');
+    const step3 = document.getElementById('step3');
+    const captionList = document.getElementById('captionList');
+    const approvedCount = document.getElementById('approvedCount');
+    const approveAllBtn = document.getElementById('approveAllBtn');
+    const continueToExportBtn = document.getElementById('continueToExportBtn');
+    const backToUploadBtn = document.getElementById('backToUploadBtn');
+    const backToReviewBtn = document.getElementById('backToReviewBtn');
+    const downloadZipBtn = document.getElementById('downloadZipBtn');
+    const progressBar = document.getElementById('progressBar');
+    const systemStatus = document.getElementById('systemStatus');
+    const scanLine = document.getElementById('scanLine');
+
+    // Step indicators
+    function updateStepIndicators() {
+      const step1Ind = document.getElementById('step1-indicator');
+      const step2Ind = document.getElementById('step2-indicator');
+      const step3Ind = document.getElementById('step3-indicator');
+
+      // Reset all
+      step1Ind.className = 'h-10 px-6 lcars-pill flex items-center justify-center cursor-pointer hover:brightness-110 transition';
+      step2Ind.className = 'h-10 px-6 lcars-pill flex items-center justify-center cursor-pointer hover:brightness-110 transition';
+      step3Ind.className = 'h-10 px-6 lcars-pill flex items-center justify-center cursor-pointer hover:brightness-110 transition';
+
+      if (currentStep === 1) {
+        step1Ind.classList.add('bg-lcars-orange');
+        step1Ind.innerHTML = '<span class="text-black font-bold tracking-wider">UPLOAD</span>';
+        step2Ind.classList.add('bg-lcars-lavender/30');
+        step2Ind.innerHTML = '<span class="text-lcars-lavender/60 font-bold tracking-wider">REVIEW</span>';
+        step3Ind.classList.add('bg-lcars-blue/30');
+        step3Ind.innerHTML = '<span class="text-lcars-blue/60 font-bold tracking-wider">EXPORT</span>';
+        progressBar.style.width = '0%';
+      } else if (currentStep === 2) {
+        step1Ind.classList.add('bg-green-500');
+        step1Ind.innerHTML = '<span class="text-black font-bold tracking-wider">&#10003;</span>';
+        step2Ind.classList.add('bg-lcars-lavender');
+        step2Ind.innerHTML = '<span class="text-black font-bold tracking-wider">REVIEW</span>';
+        step3Ind.classList.add('bg-lcars-blue/30');
+        step3Ind.innerHTML = '<span class="text-lcars-blue/60 font-bold tracking-wider">EXPORT</span>';
+        progressBar.style.width = '50%';
+      } else {
+        step1Ind.classList.add('bg-green-500');
+        step1Ind.innerHTML = '<span class="text-black font-bold tracking-wider">&#10003;</span>';
+        step2Ind.classList.add('bg-green-500');
+        step2Ind.innerHTML = '<span class="text-black font-bold tracking-wider">&#10003;</span>';
+        step3Ind.classList.add('bg-lcars-blue');
+        step3Ind.innerHTML = '<span class="text-black font-bold tracking-wider">EXPORT</span>';
+        progressBar.style.width = '100%';
+      }
+    }
+
+    function showStep(step) {
+      currentStep = step;
+      step1.classList.toggle('hidden', step !== 1);
+      step2.classList.toggle('hidden', step !== 2);
+      step3.classList.toggle('hidden', step !== 3);
+      updateStepIndicators();
+    }
+
+    // File handling
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('border-lcars-blue', 'bg-lcars-blue/10');
+      scanLine.classList.remove('opacity-0');
+    });
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('border-lcars-blue', 'bg-lcars-blue/10');
+      scanLine.classList.add('opacity-0');
+    });
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-lcars-blue', 'bg-lcars-blue/10');
+      scanLine.classList.add('opacity-0');
+      handleFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+    function handleFiles(files) {
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      const newFiles = Array.from(files).filter(f => validTypes.includes(f.type));
+
+      newFiles.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          images.push({
+            file,
+            name: file.name,
+            dataUrl: e.target.result,
+            base64: e.target.result.split(',')[1],
+            mediaType: file.type
+          });
+          updateImageGrid();
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function updateImageGrid() {
+      imageGrid.innerHTML = '';
+      images.forEach((img, i) => {
+        const card = document.createElement('div');
+        card.className = 'image-card relative aspect-square rounded overflow-hidden group border-2 border-lcars-peach/30 hover:border-lcars-peach transition';
+        card.innerHTML = `
+          <img src="${img.dataUrl}" class="w-full h-full object-cover" />
+          <div class="absolute top-1 left-1 w-6 h-6 bg-lcars-peach text-black text-xs font-bold flex items-center justify-center rounded">${String(i + 1).padStart(2, '0')}</div>
+          <button class="remove-btn absolute top-1 right-1 w-6 h-6 rounded bg-lcars-red text-white text-xs opacity-0 transition-opacity hover:bg-red-400 font-bold" onclick="removeImage(${i})">X</button>
+        `;
+        imageGrid.appendChild(card);
+      });
+
+      imageCount.textContent = images.length;
+      previewSection.classList.toggle('hidden', images.length === 0);
+      generateSection.classList.toggle('hidden', images.length === 0);
+    }
+
+    window.removeImage = function(index) {
+      images.splice(index, 1);
+      updateImageGrid();
+    };
+
+    clearAllBtn.addEventListener('click', () => {
+      images = [];
+      updateImageGrid();
+    });
+
+    // Generate captions
+    generateBtn.addEventListener('click', async () => {
+      if (images.length === 0) return;
+
+      captions = images.map((img, i) => ({
+        index: i,
+        image: img,
+        caption: '',
+        status: 'pending',
+        approved: false
+      }));
+
+      showStep(2);
+      systemStatus.textContent = 'ANALYZING';
+      systemStatus.classList.add('blink');
+      renderCaptionList();
+      await processImages();
+      systemStatus.textContent = 'COMPLETE';
+      systemStatus.classList.remove('blink');
+    });
+
+    function renderCaptionList() {
+      captionList.innerHTML = '';
+      captions.forEach((item, i) => {
+        const card = document.createElement('div');
+        const borderColor = item.status === 'error' ? 'border-lcars-red' : item.approved ? 'border-green-500' : 'border-lcars-lavender/30';
+        const bgColor = item.approved ? 'bg-green-500/5' : 'bg-lcars-bg';
+        card.className = `rounded-lg p-4 border-2 ${borderColor} ${bgColor} flex gap-4 items-start transition-all`;
+        card.id = `caption-card-${i}`;
+
+        const indexBadge = String(i + 1).padStart(2, '0');
+        let captionContent = '';
+
+        if (item.status === 'pending') {
+          captionContent = `<div class="flex items-center gap-3 text-lcars-blue"><div class="w-5 h-5 border-2 border-lcars-blue border-t-transparent rounded-full spinner"></div><span class="tracking-wider">ANALYZING IMAGE DATA...</span></div>`;
+        } else if (item.status === 'error') {
+          captionContent = `<div class="text-lcars-red tracking-wider">${item.error || 'ANALYSIS FAILED'}</div>`;
+        } else {
+          captionContent = `<div class="text-lcars-peach caption-text">${item.caption}</div>`;
+        }
+
+        card.innerHTML = `
+          <div class="relative flex-shrink-0">
+            <img src="${item.image.dataUrl}" class="w-24 h-24 rounded object-cover border-2 ${item.approved ? 'border-green-500' : 'border-lcars-lavender/50'}" />
+            <div class="absolute -top-2 -left-2 w-7 h-7 bg-lcars-lavender text-black text-xs font-bold flex items-center justify-center rounded">${indexBadge}</div>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-lcars-lavender/60 text-sm mb-2 tracking-wider uppercase">${item.image.name}</div>
+            <div class="caption-content">${captionContent}</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="w-10 h-10 rounded bg-lcars-purple/30 border border-lcars-purple text-lcars-purple hover:bg-lcars-purple/50 transition font-bold" onclick="regenerateCaption(${i})" title="Regenerate">&#8634;</button>
+            <button class="w-10 h-10 rounded bg-lcars-blue/30 border border-lcars-blue text-lcars-blue hover:bg-lcars-blue/50 transition font-bold" onclick="editCaption(${i})" title="Edit">&#9998;</button>
+            <button class="w-10 h-10 rounded bg-lcars-red/30 border border-lcars-red text-lcars-red hover:bg-lcars-red/50 transition font-bold" onclick="deleteCaption(${i})" title="Delete">&#10005;</button>
+            <button class="w-10 h-10 rounded ${item.approved ? 'bg-green-600 border-green-500 text-white' : 'bg-green-600/30 border border-green-600 text-green-500'} hover:bg-green-500 transition font-bold" onclick="toggleApprove(${i})" title="Verify">&#10003;</button>
+          </div>
+        `;
+
+        captionList.appendChild(card);
+      });
+
+      updateApprovedCount();
+    }
+
+    async function processImages() {
+      const triggerWord = triggerWordInput.value || 'my_character';
+
+      for (let i = 0; i < captions.length; i++) {
+        if (captions[i].status !== 'pending') continue;
+
+        try {
+          const response = await fetch('/api/analyze-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageBase64: captions[i].image.base64,
+              mediaType: captions[i].image.mediaType,
+              triggerWord
+            })
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            captions[i].status = 'complete';
+            captions[i].caption = data.caption;
+          } else {
+            captions[i].status = 'error';
+            captions[i].error = data.error;
+          }
+        } catch (error) {
+          captions[i].status = 'error';
+          captions[i].error = 'NETWORK ERROR';
+        }
+
+        renderCaptionList();
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      const allDone = captions.every(c => c.status !== 'pending');
+      approveAllBtn.classList.toggle('hidden', !allDone);
+    }
+
+    window.regenerateCaption = async function(index) {
+      captions[index].status = 'pending';
+      captions[index].caption = '';
+      captions[index].approved = false;
+      renderCaptionList();
+
+      const triggerWord = triggerWordInput.value || 'my_character';
+
+      try {
+        const response = await fetch('/api/analyze-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: captions[index].image.base64,
+            mediaType: captions[index].image.mediaType,
+            triggerWord
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          captions[index].status = 'complete';
+          captions[index].caption = data.caption;
+        } else {
+          captions[index].status = 'error';
+          captions[index].error = data.error;
+        }
+      } catch (error) {
+        captions[index].status = 'error';
+        captions[index].error = 'NETWORK ERROR';
+      }
+
+      renderCaptionList();
+    };
+
+    window.editCaption = function(index) {
+      const card = document.getElementById(`caption-card-${index}`);
+      const captionContent = card.querySelector('.caption-content');
+      const currentCaption = captions[index].caption;
+
+      captionContent.innerHTML = `
+        <textarea class="w-full px-3 py-2 rounded bg-black border-2 border-lcars-blue text-lcars-peach text-sm resize-none focus:outline-none tracking-wide" rows="3" id="edit-textarea-${index}">${currentCaption}</textarea>
+        <div class="flex gap-2 mt-2">
+          <button class="px-4 py-2 rounded bg-green-600 hover:bg-green-500 text-white font-bold tracking-wider text-sm" onclick="saveCaption(${index})">SAVE</button>
+          <button class="px-4 py-2 rounded bg-lcars-purple/30 border border-lcars-purple text-lcars-purple hover:bg-lcars-purple/50 font-bold tracking-wider text-sm" onclick="cancelEdit(${index})">CANCEL</button>
+        </div>
+      `;
+    };
+
+    window.saveCaption = function(index) {
+      const textarea = document.getElementById(`edit-textarea-${index}`);
+      captions[index].caption = textarea.value;
+      captions[index].status = 'complete';
+      renderCaptionList();
+    };
+
+    window.cancelEdit = function(index) {
+      renderCaptionList();
+    };
+
+    window.deleteCaption = function(index) {
+      captions.splice(index, 1);
+      images.splice(index, 1);
+      captions.forEach((c, i) => c.index = i);
+      renderCaptionList();
+    };
+
+    window.toggleApprove = function(index) {
+      captions[index].approved = !captions[index].approved;
+      renderCaptionList();
+    };
+
+    function updateApprovedCount() {
+      const approved = captions.filter(c => c.approved).length;
+      const total = captions.length;
+      approvedCount.textContent = `${approved} OF ${total} VERIFIED`;
+
+      if (approved > 0) {
+        continueToExportBtn.disabled = false;
+        continueToExportBtn.className = 'px-6 py-2 bg-lcars-blue text-black font-bold tracking-wider rounded hover:brightness-110 transition lcars-pill-right cursor-pointer';
+      } else {
+        continueToExportBtn.disabled = true;
+        continueToExportBtn.className = 'px-6 py-2 bg-lcars-blue/30 text-lcars-blue/50 font-bold tracking-wider rounded cursor-not-allowed lcars-pill-right';
+      }
+    }
+
+    approveAllBtn.addEventListener('click', () => {
+      captions.forEach(c => {
+        if (c.status === 'complete') c.approved = true;
+      });
+      renderCaptionList();
+    });
+
+    continueToExportBtn.addEventListener('click', () => {
+      const approved = captions.filter(c => c.approved);
+      if (approved.length === 0) return;
+
+      showStep(3);
+      setupExportStep();
+    });
+
+    backToUploadBtn.addEventListener('click', () => showStep(1));
+    backToReviewBtn.addEventListener('click', () => showStep(2));
+
+    function setupExportStep() {
+      const approved = captions.filter(c => c.approved);
+      const triggerWord = triggerWordInput.value || 'my_character';
+
+      document.getElementById('exportSummary').textContent = `${approved.length} IMAGES WITH CAPTIONS PREPARED FOR TRAINING`;
+      document.getElementById('exportImageCount').innerHTML = `<span class="w-2 h-2 bg-lcars-orange rounded-full inline-block mr-2"></span>${approved.length} VERIFIED IMAGES (RESIZED)`;
+      document.getElementById('exportCaptionCount').innerHTML = `<span class="w-2 h-2 bg-lcars-orange rounded-full inline-block mr-2"></span>${approved.length} CAPTION TEXT FILES`;
+      document.getElementById('exportTriggerWord').textContent = triggerWord;
+      document.getElementById('nextStepsTrigger').textContent = triggerWord;
+
+      const preview = document.getElementById('captionPreview');
+      preview.innerHTML = approved.map((c, i) => {
+        const num = String(i + 1).padStart(2, '0');
+        return `<div class="p-2 rounded bg-black border border-lcars-blue/30"><span class="text-lcars-blue">${num}.TXT:</span> <span class="text-lcars-peach/80">${c.caption}</span></div>`;
+      }).join('');
+    }
+
+    // Image resize function
+    function resizeImage(blob, targetSize) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = targetSize;
+          canvas.height = targetSize;
+          const ctx = canvas.getContext('2d');
+
+          const scale = Math.max(targetSize / img.width, targetSize / img.height);
+          const scaledWidth = img.width * scale;
+          const scaledHeight = img.height * scale;
+          const x = (targetSize - scaledWidth) / 2;
+          const y = (targetSize - scaledHeight) / 2;
+
+          ctx.drawImage(img, x, y, scaledWidth, scaledHeight);
+
+          canvas.toBlob(resolve, 'image/png');
+        };
+        img.src = URL.createObjectURL(blob);
+      });
+    }
+
+    // ZIP export
+    downloadZipBtn.addEventListener('click', async () => {
+      const approved = captions.filter(c => c.approved);
+      if (approved.length === 0) return;
+
+      const originalText = downloadZipBtn.innerHTML;
+      downloadZipBtn.innerHTML = '<span class="inline-block w-5 h-5 border-2 border-black border-t-transparent rounded-full spinner mr-2"></span>GENERATING PACKAGE...';
+      downloadZipBtn.disabled = true;
+      systemStatus.textContent = 'COMPILING';
+      systemStatus.classList.add('blink');
+
+      try {
+        const zip = new JSZip();
+        const imagesFolder = zip.folder('images');
+        const targetSize = parseInt(document.getElementById('outputSize').value);
+        const triggerWord = triggerWordInput.value || 'my_character';
+
+        for (let i = 0; i < approved.length; i++) {
+          const item = approved[i];
+          const num = String(i + 1).padStart(2, '0');
+
+          const resizedBlob = await resizeImage(item.image.file, targetSize);
+          imagesFolder.file(`${num}.png`, resizedBlob);
+          zip.file(`${num}.txt`, item.caption);
+        }
+
+        const readme = `LORA AUTO CAPTION - TRAINING PACKAGE
+=====================================
+
+GENERATED: ${new Date().toLocaleString()}
+TRIGGER WORD: ${triggerWord}
+TOTAL IMAGES: ${approved.length}
+IMAGE SIZE: ${targetSize}x${targetSize}
+
+TRAINING PROTOCOL FOR CIVITAI:
+1. Navigate to civitai.com > Create > Train a LoRA
+2. Upload images from the "images" folder
+3. Upload matching .txt caption files
+4. Recommended parameters:
+   - Rank: 32
+   - Alpha: 16
+   - Epochs: 15-20
+5. Your trigger word is: ${triggerWord}
+
+LIVE LONG AND PROSPER.
+`;
+        zip.file('README.txt', readme);
+
+        const content = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(content);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'lora-training-package.zip';
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error('Error creating ZIP:', error);
+        alert('PACKAGE GENERATION FAILED');
+      }
+
+      downloadZipBtn.innerHTML = originalText;
+      downloadZipBtn.disabled = false;
+      systemStatus.textContent = 'COMPLETE';
+      systemStatus.classList.remove('blink');
+    });
+  </script>
+</body>
+</html>
